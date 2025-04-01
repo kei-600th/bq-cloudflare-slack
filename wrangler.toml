@@ -2,3 +2,6 @@ name = "slack-scheduler"
 compatibility_date = "2024-04-01"
 main = "index.ts"
 compatibility_flags = ["nodejs_compat"]
+
+[triggers]
+crons = ["40 8 * * *"]
