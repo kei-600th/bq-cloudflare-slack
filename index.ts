@@ -13,26 +13,37 @@ const BQ_QUERY = `
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
-      const sa = JSON.parse(env.GCP_SERVICE_ACCOUNT);
-      const token = await getGoogleAccessToken(sa);
-      const words = await runBigQuery(BQ_PROJECT_ID, BQ_QUERY, token);
-
-      const text = words.length > 0
-        ? `📘 昨日追加されたワード：\n• ` + words.join("\n• ")
-        : "昨日は新しいワードはありませんでした。";
-
-      await fetch(env.SLACK_WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-
+      await runScheduler(env);
       return new Response("Slackに送信しました");
     } catch (err) {
       return new Response(`Error: ${err}`, { status: 500 });
     }
+  },
+
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    try {
+      await runScheduler(env);
+    } catch (err) {
+      console.error("Scheduled error:", err);
+    }
   }
 };
+
+async function runScheduler(env: Env): Promise<void> {
+  const sa = JSON.parse(env.GCP_SERVICE_ACCOUNT);
+  const token = await getGoogleAccessToken(sa);
+  const words = await runBigQuery(BQ_PROJECT_ID, BQ_QUERY, token);
+
+  const text = words.length > 0
+    ? `📘 昨日追加されたワード：\n• ` + words.join("\n• ")
+    : "昨日は新しいワードはありませんでした。";
+
+  await fetch(env.SLACK_WEBHOOK_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+}
 
 // JWT作成 → アクセストークン取得
 async function getGoogleAccessToken(sa: any): Promise<string> {
@@ -69,7 +80,6 @@ async function getGoogleAccessToken(sa: any): Promise<string> {
   const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", cryptoKey, encoder.encode(toSign));
   const jwt = `${toSign}.${btoa(String.fromCharCode(...new Uint8Array(signature)))}`;
 
-  // JWTでトークン取得
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     body: new URLSearchParams({
