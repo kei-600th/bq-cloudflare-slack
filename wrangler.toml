@@ -4,4 +4,4 @@ main = "index.ts"
 compatibility_flags = ["nodejs_compat"]
 
 [triggers]
-crons = ["40 8 * * *"]
+crons = ["45 17 * * *"]
